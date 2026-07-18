@@ -1,0 +1,70 @@
+/* Google Fonts for CACTUS Design */
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Nunito:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CACTUS Admin Theme */
+:root {
+  --cream: #fdf8ef;
+  --ivory: #f9f2e3;
+  --parchment: #f3e9d2;
+  --sage: #9cbf8e;
+  --sage-l: #c8dbc0;
+  --sage-d: #6b9460;
+  --sage-dk: #4e7248;
+  --ink: #5a3e2b;
+  --ink-soft: #8a6a52;
+  --ink-light: #b89a82;
+  --pink-l: #fde8e4;
+  --pink: #f5c5bb;
+  --blue-l: #dceaf4;
+  --blue: #b5cfe0;
+  --honey: #f0c060;
+  --border: #ddd0b8;
+  --r-sm: 14px;
+  --r: 20px;
+  --r-lg: 28px;
+  --r-xl: 40px;
+  --r-full: 999px;
+  --sh-sm: 0 4px 14px rgba(100,70,40,.12);
+  --sh: 0 8px 24px rgba(100,70,40,.14), 0 2px 6px rgba(100,70,40,.08);
+  --sh-lg: 0 16px 48px rgba(100,70,40,.16), 0 4px 12px rgba(100,70,40,.10);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Nunito', system-ui, sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--ivory); border-radius: var(--r-full); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--r-full); }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-light); }
+
+/* Animations */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Focus States */
+*:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 2px;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Fraunces', Georgia, serif;
+  line-height: 1.2;
+  color: var(--ink);
+}
