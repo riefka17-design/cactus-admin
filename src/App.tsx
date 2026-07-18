@@ -1,3 +1,19 @@
+import { supabase } from "./lib/supabase";
+
+async function testSupabase(){
+
+ const {data,error}= await supabase
+ .from("workshops")
+ .select("*")
+
+
+ console.log(data)
+ console.log(error)
+
+}
+
+testSupabase()
+
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   LayoutDashboard,
