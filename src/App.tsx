@@ -1314,7 +1314,6 @@ function WorkshopModal({ workshop, onClose, onSave }: { workshop: Workshop | nul
       return; // jangan tutup modal kalau gagal
     }
 
-
   alert('UPDATE SUCCESS');
 
   onClose();
