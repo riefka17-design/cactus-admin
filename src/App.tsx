@@ -367,25 +367,63 @@ const { error } = await supabase
   };
 
   const handleDeleteWorkshop = async (workshopId: string) => {
-  if (!confirm('Are you sure you want to delete this workshop?')) return;
+    if (!confirm('Are you sure you want to delete this workshop?')) return;
 
-  try {
-    const { error } = await supabase
-      .from('workshops')
-      .delete()
-      .eq('id', workshopId);
+    console.log('[DELETE] Workshop ID:', workshopId);
 
-    if (error) {
-      console.error('DELETE ERROR:', error);
-      alert(error.message);
-      return;
+    try {
+      // UPDATE/DELETE policies on Supabase require an authenticated admin.
+      const { data: { session } } = await supabase.auth.getSession();
+
+      console.log('[DELETE] Session:', session);
+      console.log('[DELETE] User:', session?.user);
+      console.log('[DELETE] Role:', session?.user?.user_metadata?.role);
+
+      if (!session) {
+        alert('Admin belum login ke Supabase. Silakan login terlebih dahulu.');
+        return;
+      }
+
+      if (session.user.user_metadata?.role !== 'admin') {
+        alert('Akun yang sedang login bukan admin.');
+        return;
+      }
+
+      const { count, error } = await supabase
+        .from('workshops')
+        .delete({ count: 'exact' })
+        .eq('id', workshopId);
+
+      console.log('[DELETE] Count:', count);
+      console.log('[DELETE] Error:', error);
+
+      if (error) {
+        console.error('[DELETE] FAILED:', error);
+        alert(`Gagal menghapus workshop:\n\n${error.message}`);
+        return;
+      }
+
+      if (count !== 1) {
+        console.error('[DELETE] No row deleted. Count:', count);
+        alert(
+          'Workshop tidak terhapus.\n\n' +
+          'Pastikan Workshop ID benar dan policy DELETE mengizinkan admin.'
+        );
+        return;
+      }
+
+      console.log('[DELETE] SUCCESS');
+      await fetchAllData();
+      alert('Workshop berhasil dihapus.');
+    } catch (error) {
+      console.error('[DELETE] Unexpected error:', error);
+      alert(
+        `Terjadi error:\n\n${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
-
-    await fetchAllData();
-  } catch (error) {
-    console.error('Error deleting workshop:', error);
-  }
-};
+  };
 
   const navItems = [
     { id: 'dashboard' as Page, label: 'Dashboard', icon: LayoutDashboard },
@@ -1275,7 +1313,7 @@ function SettingsPage() {
 }
 
 // Workshop Modal
-function WorkshopModal({ workshop, onClose, onSave }: { workshop: Workshop | null; onClose: () => void; onSave: () => void }) {
+function WorkshopModal({ workshop, onClose, onSave }: { workshop: Workshop | null; onClose: () => void; onSave: () => Promise<void> | void }) {
   const [form, setForm] = useState({
     title: workshop?.title || '',
     description: workshop?.description || '',
@@ -1294,53 +1332,101 @@ function WorkshopModal({ workshop, onClose, onSave }: { workshop: Workshop | nul
   });
 
 const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  try {
-    let result;
+    e.preventDefault();
 
-    if (workshop) {
-      
-    console.log('[CACTUS ADMIN] Workshop ID:', workshop?.id);
-console.log('[CACTUS ADMIN] Form Data:', form);
+    console.log('================================');
+    console.log('[WORKSHOP] SUBMIT');
+    console.log('================================');
+    console.log('[WORKSHOP] ID:', workshop?.id);
+    console.log('[WORKSHOP] Form Data:', form);
 
-      console.log('STEP 1 - BEFORE UPDATE');
-      result = await supabase
-        .from('workshops')
-        .update(form)
-        .eq('id', workshop.id)
-      console.log('STEP 2 - AFTER UPDATE', result);
-    } else {
-      console.log('STEP 1 - BEFORE INSERT');
-      result = await supabase
-        .from('workshops')
-        .insert([form])
-        .select();
-      console.log('STEP 2 - AFTER INSERT', result);
+    try {
+      // INSERT/UPDATE policies on Supabase require an authenticated admin.
+      const { data: { session } } = await supabase.auth.getSession();
+
+      console.log('[WORKSHOP] Session:', session);
+      console.log('[WORKSHOP] User:', session?.user);
+      console.log('[WORKSHOP] Role:', session?.user?.user_metadata?.role);
+
+      if (!session) {
+        alert('Admin belum login ke Supabase. Silakan login terlebih dahulu.');
+        return;
+      }
+
+      if (session.user.user_metadata?.role !== 'admin') {
+        alert('Akun yang sedang login bukan admin.');
+        return;
+      }
+
+      if (workshop) {
+        // =========================
+        // UPDATE WORKSHOP
+        // =========================
+        console.log('[UPDATE] Workshop ID:', workshop.id);
+        console.log('[UPDATE] Form Data:', form);
+
+        const { count, error } = await supabase
+          .from('workshops')
+          .update(form, { count: 'exact' })
+          .eq('id', workshop.id);
+
+        console.log('[UPDATE] Count:', count);
+        console.log('[UPDATE] Error:', error);
+
+        if (error) {
+          console.error('[UPDATE] FAILED:', error);
+          alert(`Gagal memperbarui workshop:\n\n${error.message}`);
+          return;
+        }
+
+        if (count !== 1) {
+          console.error('[UPDATE] No row updated. Count:', count);
+          alert(
+            'Workshop tidak berhasil diperbarui.\n\n' +
+            'Pastikan Workshop ID benar dan policy UPDATE mengizinkan admin.'
+          );
+          return;
+        }
+
+        console.log('[UPDATE] SUCCESS');
+        await onSave();
+        onClose();
+        alert('Workshop berhasil diperbarui.');
+      } else {
+        // =========================
+        // INSERT WORKSHOP
+        // =========================
+        console.log('[INSERT] Form Data:', form);
+
+        const { data, error } = await supabase
+          .from('workshops')
+          .insert([form])
+          .select()
+          .single();
+
+        console.log('[INSERT] Data:', data);
+        console.log('[INSERT] Error:', error);
+
+        if (error) {
+          console.error('[INSERT] FAILED:', error);
+          alert(`Gagal membuat workshop:\n\n${error.message}`);
+          return;
+        }
+
+        console.log('[INSERT] SUCCESS:', data);
+        await onSave();
+        onClose();
+        alert('Workshop berhasil dibuat.');
+      }
+    } catch (error) {
+      console.error('[WORKSHOP] Unexpected error:', error);
+      alert(
+        `Terjadi error:\n\n${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
-
-    console.log('[CACTUS ADMIN] Save result:', result);
-
-    console.log('[CACTUS ADMIN] Workshop ID:', workshop?.id);
-    console.log('[CACTUS ADMIN] Form Data:', form);
-    console.log('[CACTUS ADMIN] Result Data:', result.data);
-    console.log('[CACTUS ADMIN] Result Error:', result.error);
-
-    if (result.error) {
-      alert('Gagal menyimpan: ' + result.error.message);
-      console.error('[CACTUS ADMIN] Supabase error:', result.error);
-      return; // jangan tutup modal kalau gagal
-    }
-
-  alert('UPDATE SUCCESS');
-
-  onClose();
-  window.location.reload();
-
-  } catch (error) {
-    console.error('Error saving workshop:', error);
-    alert('Terjadi error: ' + (error instanceof Error ? error.message : String(error)));
-  }
-};
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
