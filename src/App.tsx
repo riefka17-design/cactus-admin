@@ -323,17 +323,17 @@ export default function App() {
 
   // Actions
   const handleVerifyPayment = async (paymentId: string, approve: boolean, reason?: string) => {
-    console.log('[PAYMENT] ID:', paymentId);
-    console.log('[PAYMENT] Approve:', approve);
-
     try {
+      console.log('[PAYMENT] ID:', paymentId);
+      console.log('[PAYMENT] Approve:', approve);
+
       const updates: Record<string, unknown> = {
         status: approve ? 'verified' : 'rejected',
         verified_at: new Date().toISOString(),
       };
 
-      if (!approve && reason) {
-        updates.rejection_reason = reason;
+      if (!approve && reason?.trim()) {
+        updates.rejection_reason = reason.trim();
       }
 
       console.log('[PAYMENT] Updates:', updates);
@@ -350,20 +350,21 @@ export default function App() {
 
       if (error) {
         console.error('[PAYMENT] UPDATE ERROR:', error);
-        alert(`Gagal ${approve ? 'approve' : 'reject'} payment:\n\n${error.message}`);
+        alert('Gagal memperbarui payment: ' + error.message);
         return;
       }
 
       if (!data) {
-        alert('Payment tidak berubah. Periksa RLS policy tabel payments.');
+        alert('Payment tidak berubah. Periksa ID payment dan RLS policy.');
         return;
       }
 
       await fetchAllData();
+
       alert(approve ? 'Payment berhasil di-approve.' : 'Payment berhasil ditolak.');
     } catch (error) {
       console.error('[PAYMENT] Unexpected error:', error);
-      alert(`Terjadi error: ${error instanceof Error ? error.message : String(error)}`);
+      alert('Terjadi error: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
