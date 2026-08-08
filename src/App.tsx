@@ -367,27 +367,25 @@ const { error } = await supabase
   };
 
   const handleDeleteWorkshop = async (workshopId: string) => {
-    if (!confirm('Are you sure you want to delete this workshop?')) return;
-    try {
-      const { data, error } = await supabase
-        .from('workshops')
-        .update(form)
-        .eq('id', workshop.id)
-        .select();
+  if (!confirm('Are you sure you want to delete this workshop?')) return;
 
-console.log('DATA:', data)
-console.log('ERROR:', error)
+  try {
+    const { error } = await supabase
+      .from('workshops')
+      .delete()
+      .eq('id', workshopId);
 
-if (error) {
-  console.error('DELETE ERROR:', error);
-  alert(error.message);
-  return;
-}
-      await fetchAllData();
-    } catch (error) {
-      console.error('Error deleting workshop:', error);
+    if (error) {
+      console.error('DELETE ERROR:', error);
+      alert(error.message);
+      return;
     }
-  };
+
+    await fetchAllData();
+  } catch (error) {
+    console.error('Error deleting workshop:', error);
+  }
+};
 
   const navItems = [
     { id: 'dashboard' as Page, label: 'Dashboard', icon: LayoutDashboard },
