@@ -1,18 +1,4 @@
-import { supabase } from "./lib/supabase";
 
-async function testSupabase(){
-
- const {data,error}= await supabase
- .from("workshops")
- .select("*")
-
-
- console.log(data)
- console.log(error)
-
-}
-
-testSupabase()
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -258,10 +244,10 @@ export default function App() {
 
       // Fetch each table individually with error handling for each
       const [workshopsRes, registrationsRes, paymentsRes, ticketsRes] = await Promise.all([
-        supabase.from('workshops').select('*').order('date', { ascending: true }),
-        supabase.from('registrations').select('*, workshop:workshops(*)').order('created_at', { ascending: false }),
-        supabase.from('payments').select('*, registration:registrations(*, workshop:workshops(*))').order('created_at', { ascending: false }),
-        supabase.from('tickets').select('*, registration:registrations(*, workshop:workshops(*))').order('created_at', { ascending: false }),
+      supabase.from('workshops').select('*'),
+      supabase.from('registrations').select('*'),
+      supabase.from('payments').select('*'),
+      supabase.from('tickets').select('*'),
       ]);
 
       // Log any errors from individual queries
@@ -1281,19 +1267,30 @@ function WorkshopModal({ workshop, onClose, onSave }: { workshop: Workshop | nul
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (workshop) {
-        await supabase.from('workshops').update(form).eq('id', workshop.id);
-      } else {
-        await supabase.from('workshops').insert([form]);
-      }
-      onSave();
-      onClose();
-    } catch (error) {
-      console.error('Error saving workshop:', error);
+  e.preventDefault();
+  try {
+    let result;
+    if (workshop) {
+      result = await supabase.from('workshops').update(form).eq('id', workshop.id).select();
+    } else {
+      result = await supabase.from('workshops').insert([form]).select();
     }
-  };
+
+    console.log('[CACTUS ADMIN] Save result:', result);
+
+    if (result.error) {
+      alert('Gagal menyimpan: ' + result.error.message);
+      console.error('[CACTUS ADMIN] Supabase error:', result.error);
+      return; // jangan tutup modal kalau gagal
+    }
+
+    onSave();
+    onClose();
+  } catch (error) {
+    console.error('Error saving workshop:', error);
+    alert('Terjadi error: ' + (error instanceof Error ? error.message : String(error)));
+  }
+};
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
