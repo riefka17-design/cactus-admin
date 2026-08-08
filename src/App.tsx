@@ -1314,8 +1314,12 @@ function WorkshopModal({ workshop, onClose, onSave }: { workshop: Workshop | nul
       return; // jangan tutup modal kalau gagal
     }
 
-    onSave();
-    onClose();
+
+  alert('UPDATE SUCCESS');
+
+  onClose();
+  window.location.reload();
+
   } catch (error) {
     console.error('Error saving workshop:', error);
     alert('Terjadi error: ' + (error instanceof Error ? error.message : String(error)));
