@@ -1291,14 +1291,26 @@ function WorkshopModal({ workshop, onClose, onSave }: { workshop: Workshop | nul
     color: workshop?.color || '#c8dbc0',
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   try {
     let result;
+
     if (workshop) {
-      result = await supabase.from('workshops').update(form).eq('id', workshop.id).select();
+      console.log('STEP 1 - BEFORE UPDATE');
+      result = await supabase
+        .from('workshops')
+        .update(form)
+        .eq('id', workshop.id)
+        .select();
+      console.log('STEP 2 - AFTER UPDATE', result);
     } else {
-      result = await supabase.from('workshops').insert([form]).select();
+      console.log('STEP 1 - BEFORE INSERT');
+      result = await supabase
+        .from('workshops')
+        .insert([form])
+        .select();
+      console.log('STEP 2 - AFTER INSERT', result);
     }
 
     console.log('[CACTUS ADMIN] Save result:', result);
