@@ -369,10 +369,14 @@ const { error } = await supabase
   const handleDeleteWorkshop = async (workshopId: string) => {
     if (!confirm('Are you sure you want to delete this workshop?')) return;
     try {
-      const { error } = await supabase
-  .from('workshops')
-  .delete()
-  .eq('id', workshopId);
+      const { data, error } = await supabase
+        .from('workshops')
+        .update(form)
+        .eq('id', workshop.id)
+        .select();
+
+console.log('DATA:', data)
+console.log('ERROR:', error)
 
 if (error) {
   console.error('DELETE ERROR:', error);
@@ -1297,12 +1301,15 @@ const handleSubmit = async (e: React.FormEvent) => {
     let result;
 
     if (workshop) {
+      
+    console.log('[CACTUS ADMIN] Workshop ID:', workshop?.id);
+console.log('[CACTUS ADMIN] Form Data:', form);
+
       console.log('STEP 1 - BEFORE UPDATE');
       result = await supabase
         .from('workshops')
         .update(form)
         .eq('id', workshop.id)
-        .select();
       console.log('STEP 2 - AFTER UPDATE', result);
     } else {
       console.log('STEP 1 - BEFORE INSERT');
