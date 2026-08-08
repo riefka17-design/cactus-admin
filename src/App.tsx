@@ -1303,6 +1303,11 @@ function WorkshopModal({ workshop, onClose, onSave }: { workshop: Workshop | nul
 
     console.log('[CACTUS ADMIN] Save result:', result);
 
+    console.log('[CACTUS ADMIN] Workshop ID:', workshop?.id);
+    console.log('[CACTUS ADMIN] Form Data:', form);
+    console.log('[CACTUS ADMIN] Result Data:', result.data);
+    console.log('[CACTUS ADMIN] Result Error:', result.error);
+
     if (result.error) {
       alert('Gagal menyimpan: ' + result.error.message);
       console.error('[CACTUS ADMIN] Supabase error:', result.error);
