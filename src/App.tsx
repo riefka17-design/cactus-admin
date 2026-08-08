@@ -331,7 +331,16 @@ export default function App() {
       if (!approve && reason) {
         updates.rejection_reason = reason;
       }
-      await supabase.from('payments').update(updates).eq('id', paymentId);
+      const { error } = await supabase
+  .from('payments')
+  .update(updates)
+  .eq('id', paymentId);
+
+if (error) {
+  console.error('PAYMENT UPDATE ERROR:', error);
+  alert(error.message);
+  return;
+}
       await fetchAllData();
     } catch (error) {
       console.error('Error updating payment:', error);
@@ -340,11 +349,18 @@ export default function App() {
 
   const handleCheckIn = async (ticketId: string) => {
     try {
-      await supabase.from('tickets').update({
-        is_used: true,
-        used_at: new Date().toISOString(),
-      }).eq('id', ticketId);
-      await fetchAllData();
+const { error } = await supabase
+  .from('tickets')
+  .update({
+    is_used: true,
+    used_at: new Date().toISOString(),
+  })
+  .eq('id', ticketId);
+  if (error)
+    { console.error('CHECKIN ERROR:', error);
+      alert(error.message);
+      return;}
+  await fetchAllData();
     } catch (error) {
       console.error('Error checking in:', error);
     }
@@ -353,7 +369,16 @@ export default function App() {
   const handleDeleteWorkshop = async (workshopId: string) => {
     if (!confirm('Are you sure you want to delete this workshop?')) return;
     try {
-      await supabase.from('workshops').delete().eq('id', workshopId);
+      const { error } = await supabase
+  .from('workshops')
+  .delete()
+  .eq('id', workshopId);
+
+if (error) {
+  console.error('DELETE ERROR:', error);
+  alert(error.message);
+  return;
+}
       await fetchAllData();
     } catch (error) {
       console.error('Error deleting workshop:', error);
