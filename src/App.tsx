@@ -22,6 +22,8 @@ import {
   Menu,
   X as CloseIcon,
   AlertTriangle,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 
@@ -222,10 +224,9 @@ export default function App() {
     };
   }, [workshops, registrations, payments, tickets]);
 
-  // Fetch all data
-  useEffect(() => {
-    fetchAllData();
-  }, []);
+  // Authentication state
+  const [authLoading, setAuthLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
   const fetchAllData = useCallback(async () => {
     setLoading(true);
@@ -289,6 +290,61 @@ export default function App() {
     }
   }, []);
 
+  // Supabase Admin Authentication
+  // The dashboard only renders for an authenticated user whose user_metadata.role is 'admin'.
+  useEffect(() => {
+    let mounted = true;
+
+    const loadSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      if (error) {
+        console.error('[AUTH] Session error:', error);
+        setUser(null);
+      } else {
+        const sessionUser = data.session?.user ?? null;
+        const isAdmin = sessionUser?.user_metadata?.role === 'admin';
+        setUser(isAdmin ? sessionUser : null);
+        if (isAdmin) {
+          await fetchAllData();
+        }
+      }
+      setAuthLoading(false);
+    };
+
+    loadSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      const sessionUser = session?.user ?? null;
+      const isAdmin = sessionUser?.user_metadata?.role === 'admin';
+      setUser(isAdmin ? sessionUser : null);
+      setAuthLoading(false);
+      if (isAdmin) {
+        void fetchAllData();
+      } else {
+        setWorkshops([]);
+        setRegistrations([]);
+        setPayments([]);
+        setTickets([]);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, [fetchAllData]);
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('[AUTH] Logout error:', error);
+      alert('Gagal logout: ' + error.message);
+    }
+  };
+
   // Filtered data - with safe string operations
   const filteredWorkshops = useMemo(() => {
     if (!workshopFilter) return workshops;
@@ -321,74 +377,45 @@ export default function App() {
     return tickets.filter(t => safeLower(t.ticket_number).includes(filter));
   }, [tickets, ticketFilter]);
 
-  // Payment verification
-  // IMPORTANT: This function only changes the payment record.
-  // The existing payment fetch, registration fetch, ticket fetch, and workshop
-  // logic are intentionally left untouched.
+  // Actions
   const handleVerifyPayment = async (paymentId: string, approve: boolean, reason?: string) => {
-    const cleanPaymentId = safeString(paymentId).trim();
-
-    if (!cleanPaymentId) {
-      console.error('[PAYMENT] Missing payment ID');
-      alert('Gagal memverifikasi payment: payment ID tidak ditemukan.');
-      return;
-    }
-
     try {
-      console.log('[PAYMENT] Starting verification:', {
-        paymentId: cleanPaymentId,
-        approve,
-      });
+      console.log('[PAYMENT] Starting verification:', { paymentId, approve });
 
       const updates: Record<string, unknown> = {
         status: approve ? 'verified' : 'rejected',
         verified_at: new Date().toISOString(),
       };
-
-      if (!approve) {
-        updates.rejection_reason = reason?.trim() || null;
+      if (!approve && reason) {
+        updates.rejection_reason = reason;
       }
 
-      console.log('[PAYMENT] UPDATE payload:', updates);
-
-      // Do not add a .select() here. The purpose of this request is the UPDATE.
-      // A SELECT after UPDATE can introduce an additional RLS requirement and
-      // make a successful UPDATE look like a verification failure.
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('payments')
         .update(updates)
-        .eq('id', cleanPaymentId);
+        .eq('id', paymentId)
+        .select('id, status, verified_at, rejection_reason')
+        .single();
+
+      console.log('[PAYMENT] UPDATE RESULT:', data);
 
       if (error) {
         console.error('[PAYMENT] SUPABASE UPDATE ERROR:', error);
-        console.error('[PAYMENT] Error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-        });
-
-        alert(
-          `Gagal memperbarui payment.\n\n` +
-          `Code: ${error.code || '-'}\n` +
-          `Message: ${error.message}\n` +
-          (error.details ? `Details: ${error.details}\n` : '') +
-          (error.hint ? `Hint: ${error.hint}` : '')
-        );
+        alert('Gagal memperbarui payment: ' + error.message);
         return;
       }
 
-      // Reuse the existing fetch function so the UI reflects the database
-      // without introducing another payment-fetch implementation.
-      await fetchAllData();
+      if (!data) {
+        alert('Payment tidak ditemukan atau tidak dapat diperbarui.');
+        return;
+      }
 
-      alert(approve ? 'Payment berhasil di-approve.' : 'Payment berhasil ditolak.');
+      alert(approve ? 'Payment berhasil diverifikasi.' : 'Payment berhasil ditolak.');
+      setViewingPayment(null);
+      await fetchAllData();
     } catch (error) {
       console.error('[PAYMENT] Unexpected verification error:', error);
-      alert(
-        'Terjadi error saat memverifikasi payment: ' +
-        (error instanceof Error ? error.message : String(error))
-      );
+      alert('Terjadi error saat memverifikasi payment: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -440,6 +467,14 @@ const { error } = await supabase
     { id: 'tickets' as Page, label: 'Check-In', icon: Ticket },
     { id: 'settings' as Page, label: 'Settings', icon: Settings },
   ];
+
+  if (authLoading) {
+    return <AuthLoadingScreen />;
+  }
+
+  if (!user) {
+    return <AdminLoginScreen />;
+  }
 
   return (
     <div className="min-h-screen" style={{ background: adminColors.cream }}>
@@ -556,7 +591,7 @@ const { error } = await supabase
             {sidebarOpen && (
               <div className="overflow-hidden">
                 <p className="font-semibold text-sm truncate" style={{ color: adminColors.ink }}>Admin User</p>
-                <p className="text-xs truncate" style={{ color: adminColors.inkLight }}>admin@cactus.id</p>
+                <p className="text-xs truncate" style={{ color: adminColors.inkLight }}>{safeString(user?.email, 'Admin')}</p>
               </div>
             )}
           </div>
@@ -589,8 +624,18 @@ const { error } = await supabase
               onClick={fetchAllData}
               className="p-2.5 rounded-xl transition-colors"
               style={{ background: adminColors.parchment, color: adminColors.inkSoft }}
+              title="Refresh"
             >
               <RefreshCw size={18} />
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-3 py-2.5 rounded-xl transition-colors flex items-center gap-2 text-sm font-semibold"
+              style={{ background: adminColors.pinkLight, color: adminColors.danger }}
+              title="Logout"
+            >
+              <LogOut size={16} />
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </header>
@@ -685,6 +730,119 @@ const { error } = await supabase
           onVerify={handleVerifyPayment}
         />
       )}
+    </div>
+  );
+}
+
+function AuthLoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: adminColors.cream }}>
+      <div className="text-center">
+        <div
+          className="w-12 h-12 mx-auto rounded-full animate-spin border-4"
+          style={{ borderColor: adminColors.sageLight, borderTopColor: adminColors.sage }}
+        />
+        <p className="mt-4 font-semibold" style={{ color: adminColors.ink }}>Checking admin session...</p>
+      </div>
+    </div>
+  );
+}
+
+function AdminLoginScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (loginError) {
+      console.error('[AUTH] Login error:', loginError);
+      setError(loginError.message);
+      setSubmitting(false);
+      return;
+    }
+
+    const role = data.user?.user_metadata?.role;
+    if (role !== 'admin') {
+      await supabase.auth.signOut();
+      setError('Akun ini bukan akun admin. Pastikan User Metadata memiliki role = admin.');
+    }
+
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: adminColors.cream }}>
+      <div
+        className="w-full max-w-md rounded-3xl p-7 sm:p-8"
+        style={{ background: adminColors.ivory, border: `1.5px solid ${adminColors.border}`, boxShadow: '0 18px 50px rgba(90,62,43,0.12)' }}
+      >
+        <div className="text-center mb-7">
+          <div
+            className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+            style={{ background: `linear-gradient(135deg, ${adminColors.sageLight}, ${adminColors.sage})` }}
+          >
+            <span className="font-bold text-xl" style={{ color: adminColors.primaryDark }}>AD</span>
+          </div>
+          <h1 className="text-2xl font-bold" style={{ color: adminColors.ink }}>CACTUS Admin</h1>
+          <p className="text-sm mt-1" style={{ color: adminColors.inkSoft }}>Sign in to access the admin dashboard</p>
+        </div>
+
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="block text-sm font-semibold mb-2" style={{ color: adminColors.ink }}>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@example.com"
+              autoComplete="email"
+              required
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none"
+              style={{ background: adminColors.parchment, border: `1.5px solid ${adminColors.border}`, color: adminColors.ink }}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2" style={{ color: adminColors.ink }}>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              required
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none"
+              style={{ background: adminColors.parchment, border: `1.5px solid ${adminColors.border}`, color: adminColors.ink }}
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 rounded-xl text-sm" style={{ background: adminColors.pinkLight, color: adminColors.danger }}>
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full py-3.5 rounded-xl font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
+            style={{ background: `linear-gradient(135deg, ${adminColors.sage}, ${adminColors.primaryDark})` }}
+          >
+            <LogIn size={18} />
+            {submitting ? 'Signing in...' : 'Login'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
