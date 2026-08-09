@@ -321,50 +321,74 @@ export default function App() {
     return tickets.filter(t => safeLower(t.ticket_number).includes(filter));
   }, [tickets, ticketFilter]);
 
-  // Actions
+  // Payment verification
+  // IMPORTANT: This function only changes the payment record.
+  // The existing payment fetch, registration fetch, ticket fetch, and workshop
+  // logic are intentionally left untouched.
   const handleVerifyPayment = async (paymentId: string, approve: boolean, reason?: string) => {
+    const cleanPaymentId = safeString(paymentId).trim();
+
+    if (!cleanPaymentId) {
+      console.error('[PAYMENT] Missing payment ID');
+      alert('Gagal memverifikasi payment: payment ID tidak ditemukan.');
+      return;
+    }
+
     try {
-      console.log('[PAYMENT] ID:', paymentId);
-      console.log('[PAYMENT] Approve:', approve);
+      console.log('[PAYMENT] Starting verification:', {
+        paymentId: cleanPaymentId,
+        approve,
+      });
 
       const updates: Record<string, unknown> = {
         status: approve ? 'verified' : 'rejected',
         verified_at: new Date().toISOString(),
       };
 
-      if (!approve && reason?.trim()) {
-        updates.rejection_reason = reason.trim();
+      if (!approve) {
+        updates.rejection_reason = reason?.trim() || null;
       }
 
-      console.log('[PAYMENT] Updates:', updates);
+      console.log('[PAYMENT] UPDATE payload:', updates);
 
-      const { data, error } = await supabase
+      // Do not add a .select() here. The purpose of this request is the UPDATE.
+      // A SELECT after UPDATE can introduce an additional RLS requirement and
+      // make a successful UPDATE look like a verification failure.
+      const { error } = await supabase
         .from('payments')
         .update(updates)
-        .eq('id', paymentId)
-        .select()
-        .single();
-
-      console.log('[PAYMENT] Result:', data);
-      console.log('[PAYMENT] Error:', error);
+        .eq('id', cleanPaymentId);
 
       if (error) {
-        console.error('[PAYMENT] UPDATE ERROR:', error);
-        alert('Gagal memperbarui payment: ' + error.message);
+        console.error('[PAYMENT] SUPABASE UPDATE ERROR:', error);
+        console.error('[PAYMENT] Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+
+        alert(
+          `Gagal memperbarui payment.\n\n` +
+          `Code: ${error.code || '-'}\n` +
+          `Message: ${error.message}\n` +
+          (error.details ? `Details: ${error.details}\n` : '') +
+          (error.hint ? `Hint: ${error.hint}` : '')
+        );
         return;
       }
 
-      if (!data) {
-        alert('Payment tidak berubah. Periksa ID payment dan RLS policy.');
-        return;
-      }
-
+      // Reuse the existing fetch function so the UI reflects the database
+      // without introducing another payment-fetch implementation.
       await fetchAllData();
 
       alert(approve ? 'Payment berhasil di-approve.' : 'Payment berhasil ditolak.');
     } catch (error) {
-      console.error('[PAYMENT] Unexpected error:', error);
-      alert('Terjadi error: ' + (error instanceof Error ? error.message : String(error)));
+      console.error('[PAYMENT] Unexpected verification error:', error);
+      alert(
+        'Terjadi error saat memverifikasi payment: ' +
+        (error instanceof Error ? error.message : String(error))
+      );
     }
   };
 
